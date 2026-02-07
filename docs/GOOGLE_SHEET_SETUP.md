@@ -125,12 +125,6 @@ function deleteEntry(id) {
 
 ---
 
-## 若出現 CORS 錯誤
+## 若出現 CORS / Failed to fetch
 
-從 StackBlitz 或部分網域呼叫 Google Apps Script 時，瀏覽器可能會阻擋請求（CORS 錯誤）。
-
-**解法**：使用 CORS 代理，將網址改為：
-```
-https://corsproxy.io/?https://script.google.com/macros/s/你的ID/exec
-```
-把整段貼到記帳本的設定中即可。
+記帳本會**自動**使用 CORS 代理處理 Google Apps Script 的請求，你只需貼上原本的網址即可，無需手動加上代理前綴。
