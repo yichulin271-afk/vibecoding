@@ -184,7 +184,7 @@ function App() {
         <div className="settings-panel">
           <h3>Supabase 雲端儲存（推薦）</h3>
           <p className="settings-hint">
-            請依照 docs/SUPABASE_SETUP.md 建立資料表後，貼上 Project URL 與 anon key
+            或設環境變數 VITE_SUPABASE_URL、VITE_SUPABASE_ANON_KEY 即可自動連接（詳見 docs/SUPABASE_SETUP.md）
           </p>
           <input
             type="url"

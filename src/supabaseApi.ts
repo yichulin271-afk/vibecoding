@@ -12,9 +12,13 @@ export type Entry = {
   date: string
 }
 
+// 環境變數優先（設一次即可，不必每次從齒輪設定）
+const ENV_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const ENV_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+
 export function getSupabaseConfig(): { url: string; anonKey: string } | null {
-  const url = localStorage.getItem(SUPABASE_URL_KEY)?.trim()
-  const anonKey = localStorage.getItem(SUPABASE_ANON_KEY)?.trim()
+  const url = (ENV_URL || localStorage.getItem(SUPABASE_URL_KEY))?.trim()
+  const anonKey = (ENV_ANON_KEY || localStorage.getItem(SUPABASE_ANON_KEY))?.trim()
   if (url && anonKey) return { url, anonKey }
   return null
 }

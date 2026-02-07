@@ -45,10 +45,26 @@ CREATE POLICY "Allow all for anon" ON entries
 
 ## 步驟 4：在記帳本中設定
 
+### 方式 A：環境變數（推薦，設一次即可）
+
+**本機執行：**
+1. 複製 `.env.example` 為 `.env`
+2. 填入 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY`
+3. 之後記帳本會自動連接，不需從齒輪設定
+
+**StackBlitz：**
+1. 點左下角 **⚙️ Settings**
+2. 在 **Environment Variables** 新增：
+   - `VITE_SUPABASE_URL` = 你的 Project URL
+   - `VITE_SUPABASE_ANON_KEY` = 你的 anon key
+3. 重新整理後會自動連接
+
+### 方式 B：從齒輪設定
+
 1. 點記帳本右上角 **齒輪**
-2. 在 Supabase 區塊貼上：
-   - **Project URL**
-   - **anon key**
+2. 在 Supabase 區塊貼上 Project URL 與 anon key
 3. 點 **連接 Supabase**
+
+---
 
 完成後，記帳資料會同步到 Supabase 雲端，可跨裝置使用。
