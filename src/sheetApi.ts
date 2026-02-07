@@ -22,6 +22,17 @@ export function setSheetUrl(url: string): void {
   }
 }
 
+const USE_PROXY_KEY = 'ledger-use-proxy'
+
+export function getUseProxy(): boolean {
+  const v = localStorage.getItem(USE_PROXY_KEY)
+  return v !== 'false'
+}
+
+export function setUseProxy(use: boolean): void {
+  localStorage.setItem(USE_PROXY_KEY, String(use))
+}
+
 export function loadFromLocal(): Entry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -41,15 +52,19 @@ const CORS_PROXIES: ((u: string) => string)[] = [
   (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
 ]
 
-function getFetchUrls(url: string): string[] {
+function getFetchUrls(url: string, useProxy?: boolean): string[] {
   if (!url) return []
   const trimmed = url.trim()
-  const isGoogleScript = trimmed.includes('script.google.com')
   const alreadyProxied =
     trimmed.includes('corsproxy.io') ||
     trimmed.includes('cors.sh') ||
     trimmed.includes('cors.lol')
-  if (isGoogleScript && !alreadyProxied) {
+  const isGoogleScript = trimmed.includes('script.google.com')
+  const shouldProxy =
+    useProxy !== false &&
+    isGoogleScript &&
+    !alreadyProxied
+  if (shouldProxy) {
     return CORS_PROXIES.map((fn) => fn(trimmed))
   }
   return [trimmed]
@@ -59,13 +74,18 @@ async function fetchWithProxies(
   url: string,
   options?: RequestInit
 ): Promise<Response> {
-  const urls = getFetchUrls(url)
+  const useProxy = getUseProxy()
+  const urls = getFetchUrls(url, useProxy)
   let lastError: unknown
   for (const fetchUrl of urls) {
     try {
       const res = await fetch(fetchUrl, options)
       if (res.ok) return res
-      lastError = new Error(`HTTP ${res.status}`)
+      const msg =
+        res.status === 403
+          ? `HTTP 403：請確認 Apps Script 部署的存取權為「任何人」`
+          : `HTTP ${res.status}`
+      lastError = new Error(msg)
     } catch (e) {
       lastError = e
     }

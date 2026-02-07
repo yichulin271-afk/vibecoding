@@ -3,6 +3,8 @@ import {
   type Entry,
   getSheetUrl,
   setSheetUrl,
+  getUseProxy,
+  setUseProxy,
   loadFromLocal,
   saveToLocal,
   fetchFromSheet,
@@ -27,6 +29,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [sheetUrlInput, setSheetUrlInput] = useState(getSheetUrl())
+  const [useProxy, setUseProxyState] = useState(() => getUseProxy())
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -153,6 +156,18 @@ function App() {
             onChange={(e) => setSheetUrlInput(e.target.value)}
             className="input-sheet-url"
           />
+          <label className="settings-checkbox">
+            <input
+              type="checkbox"
+              checked={useProxy}
+              onChange={(e) => {
+                const v = e.target.checked
+                setUseProxy(v)
+                setUseProxyState(v)
+              }}
+            />
+            使用 CORS 代理（若出現 403 可嘗試取消勾選）
+          </label>
           <div className="settings-actions">
             <button type="button" className="btn-save-url" onClick={handleSaveSheetUrl}>
               儲存
