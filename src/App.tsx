@@ -11,6 +11,14 @@ import {
   addToSheet,
   deleteFromSheet,
 } from './sheetApi'
+import {
+  getSupabaseConfig,
+  setSupabaseConfig,
+  clearSupabaseConfig,
+  fetchFromSupabase,
+  addToSupabase,
+  deleteFromSupabase,
+} from './supabaseApi'
 import './App.css'
 
 const EXPENSE_CATEGORIES = ['飲食', '交通', '娛樂', '日用', '購物', '其他'] as const
@@ -30,14 +38,25 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [sheetUrlInput, setSheetUrlInput] = useState(getSheetUrl())
   const [useProxy, setUseProxyState] = useState(() => getUseProxy())
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(
+    () => getSupabaseConfig()?.url || ''
+  )
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState(
+    () => getSupabaseConfig()?.anonKey || ''
+  )
 
   const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const url = getSheetUrl()
     try {
-      if (url) {
-        const data = await fetchFromSheet(url)
+      const supabase = getSupabaseConfig()
+      const sheetUrl = getSheetUrl()
+      if (supabase) {
+        const data = await fetchFromSupabase()
+        setEntries(data)
+        saveToLocal(data)
+      } else if (sheetUrl) {
+        const data = await fetchFromSheet(sheetUrl)
         setEntries(data)
         saveToLocal(data)
       } else {
@@ -62,6 +81,14 @@ function App() {
     loadData()
   }
 
+  const handleSaveSupabase = () => {
+    setSupabaseConfig(supabaseUrlInput.trim(), supabaseKeyInput.trim())
+    setSupabaseUrlInput(supabaseUrlInput.trim())
+    setSupabaseKeyInput(supabaseKeyInput.trim())
+    setShowSettings(false)
+    loadData()
+  }
+
   const addEntry = async (e: React.FormEvent) => {
     e.preventDefault()
     const num = parseFloat(amount)
@@ -76,10 +103,15 @@ function App() {
       date: new Date().toISOString().slice(0, 10),
     }
 
+    const supabase = getSupabaseConfig()
     const url = getSheetUrl()
     setError(null)
     try {
-      if (url) {
+      if (supabase) {
+        const data = await addToSupabase(newEntry)
+        setEntries(data)
+        saveToLocal(data)
+      } else if (url) {
         const data = await addToSheet(url, newEntry)
         setEntries(data)
         saveToLocal(data)
@@ -96,10 +128,15 @@ function App() {
   }
 
   const deleteEntry = async (id: string) => {
+    const supabase = getSupabaseConfig()
     const url = getSheetUrl()
     setError(null)
     try {
-      if (url) {
+      if (supabase) {
+        const data = await deleteFromSupabase(id)
+        setEntries(data)
+        saveToLocal(data)
+      } else if (url) {
         const data = await deleteFromSheet(url, id)
         setEntries(data)
         saveToLocal(data)
@@ -145,10 +182,50 @@ function App() {
 
       {showSettings && (
         <div className="settings-panel">
-          <h3>Google Sheet 連線</h3>
+          <h3>Supabase 雲端儲存（推薦）</h3>
           <p className="settings-hint">
-            請先依照專案 docs/GOOGLE_SHEET_SETUP.md 的說明部署 Apps Script，再貼上網址
+            請依照 docs/SUPABASE_SETUP.md 建立資料表後，貼上 Project URL 與 anon key
           </p>
+          <input
+            type="url"
+            placeholder="Project URL（如 https://xxx.supabase.co）"
+            value={supabaseUrlInput}
+            onChange={(e) => setSupabaseUrlInput(e.target.value)}
+            className="input-sheet-url"
+          />
+          <input
+            type="password"
+            placeholder="anon key（Project Settings → API）"
+            value={supabaseKeyInput}
+            onChange={(e) => setSupabaseKeyInput(e.target.value)}
+            className="input-sheet-url"
+          />
+          <div className="settings-actions">
+            <button type="button" className="btn-save-url" onClick={handleSaveSupabase}>
+              連接 Supabase
+            </button>
+            {getSupabaseConfig() && (
+              <button
+                type="button"
+                className="btn-clear-url"
+                onClick={() => {
+                  clearSupabaseConfig()
+                  setSupabaseUrlInput('')
+                  setSupabaseKeyInput('')
+                  setEntries(loadFromLocal())
+                  setShowSettings(false)
+                }}
+              >
+                中斷 Supabase
+              </button>
+            )}
+          </div>
+          {getSupabaseConfig() && (
+            <p className="settings-status">✓ 已連接 Supabase</p>
+          )}
+
+          <hr className="settings-divider" />
+          <h3>Google Sheet（備用）</h3>
           <input
             type="url"
             placeholder="https://script.google.com/macros/s/xxx/exec"
@@ -166,28 +243,43 @@ function App() {
                 setUseProxyState(v)
               }}
             />
-            使用 CORS 代理（若出現 403 可嘗試取消勾選）
+            使用 CORS 代理
           </label>
           <div className="settings-actions">
             <button type="button" className="btn-save-url" onClick={handleSaveSheetUrl}>
-              儲存
+              連接 Google Sheet
             </button>
-            <button
-              type="button"
-              className="btn-clear-url"
-              onClick={() => {
-                setSheetUrl('')
-                setSheetUrlInput('')
-                setEntries(loadFromLocal())
-                setShowSettings(false)
-              }}
-            >
-              清除（改用本機儲存）
-            </button>
+            {getSheetUrl() && (
+              <button
+                type="button"
+                className="btn-clear-url"
+                onClick={() => {
+                  setSheetUrl('')
+                  setSheetUrlInput('')
+                  setEntries(loadFromLocal())
+                }}
+              >
+                中斷
+              </button>
+            )}
           </div>
-          {getSheetUrl() && (
-            <p className="settings-status">✓ 已連接 Google Sheet</p>
-          )}
+
+          <hr className="settings-divider" />
+          <button
+            type="button"
+            className="btn-clear-url"
+            onClick={() => {
+              setSheetUrl('')
+              setSheetUrlInput('')
+              clearSupabaseConfig()
+              setSupabaseUrlInput('')
+              setSupabaseKeyInput('')
+              setEntries(loadFromLocal())
+              setShowSettings(false)
+            }}
+          >
+            清除全部（改用本機儲存）
+          </button>
         </div>
       )}
 
