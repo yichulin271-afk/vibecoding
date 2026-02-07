@@ -1,120 +1,138 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
 import './App.css'
 
+type Entry = {
+  id: string
+  description: string
+  amount: number
+  type: 'income' | 'expense'
+  date: string
+}
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [entries, setEntries] = useState<Entry[]>([])
+  const [description, setDescription] = useState('')
+  const [amount, setAmount] = useState('')
+  const [type, setType] = useState<'income' | 'expense'>('expense')
+
+  const addEntry = (e: React.FormEvent) => {
+    e.preventDefault()
+    const num = parseFloat(amount)
+    if (!description.trim() || isNaN(num) || num <= 0) return
+
+    setEntries([
+      ...entries,
+      {
+        id: crypto.randomUUID(),
+        description: description.trim(),
+        amount: num,
+        type,
+        date: new Date().toISOString().slice(0, 10),
+      },
+    ])
+    setDescription('')
+    setAmount('')
+  }
+
+  const deleteEntry = (id: string) => {
+    setEntries(entries.filter((e) => e.id !== id))
+  }
+
+  const totalIncome = entries
+    .filter((e) => e.type === 'income')
+    .reduce((sum, e) => sum + e.amount, 0)
+  const totalExpense = entries
+    .filter((e) => e.type === 'expense')
+    .reduce((sum, e) => sum + e.amount, 0)
+  const balance = totalIncome - totalExpense
+
+  const formatMoney = (n: number) =>
+    new Intl.NumberFormat('zh-TW', {
+      style: 'currency',
+      currency: 'TWD',
+      minimumFractionDigits: 0,
+    }).format(n)
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="ledger-app">
+      <header className="ledger-header">
+        <h1>記帳本</h1>
+        <p className="subtitle">簡單管理你的收支</p>
+      </header>
+
+      <div className="balance-card">
+        <span className="balance-label">目前結餘</span>
+        <span className={`balance-value ${balance >= 0 ? 'positive' : 'negative'}`}>
+          {formatMoney(balance)}
+        </span>
+        <div className="balance-breakdown">
+          <span>收入：{formatMoney(totalIncome)}</span>
+          <span>支出：{formatMoney(totalExpense)}</span>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+      </div>
+
+      <form className="add-form" onSubmit={addEntry}>
+        <input
+          type="text"
+          placeholder="項目說明（如：午餐、薪水）"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="input-desc"
+        />
+        <input
+          type="number"
+          placeholder="金額"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="input-amount"
+          min="0"
+          step="1"
+        />
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as 'income' | 'expense')}
+          className="select-type"
         >
-          Count is {count}
+          <option value="expense">支出</option>
+          <option value="income">收入</option>
+        </select>
+        <button type="submit" className="btn-add">
+          新增
         </button>
-      </section>
+      </form>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
+      <section className="entry-list">
+        <h2>紀錄</h2>
+        {entries.length === 0 ? (
+          <p className="empty">尚無紀錄，新增一筆試試</p>
+        ) : (
           <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
+            {[...entries].reverse().map((entry) => (
+              <li key={entry.id} className={`entry-item ${entry.type}`}>
+                <div className="entry-info">
+                  <span className="entry-desc">{entry.description}</span>
+                  <span className="entry-date">{entry.date}</span>
+                </div>
+                <div className="entry-right">
+                  <span className={`entry-amount ${entry.type}`}>
+                    {entry.type === 'income' ? '+' : '-'}
+                    {formatMoney(entry.amount)}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-delete"
+                    onClick={() => deleteEntry(entry.id)}
+                    aria-label="刪除"
+                  >
+                    ×
+                  </button>
+                </div>
+              </li>
+            ))}
           </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
+        )}
       </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    </div>
   )
 }
 
