@@ -1,4 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  type Entry,
+  getSheetUrl,
+  setSheetUrl,
+  loadFromLocal,
+  saveToLocal,
+  fetchFromSheet,
+  addToSheet,
+  deleteFromSheet,
+} from './sheetApi'
 import './App.css'
 
 const EXPENSE_CATEGORIES = ['飲食', '交通', '娛樂', '日用', '購物', '其他'] as const
@@ -7,44 +17,97 @@ const INCOME_CATEGORIES = ['薪水', '獎金', '投資', '其他'] as const
 type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]
 type IncomeCategory = (typeof INCOME_CATEGORIES)[number]
 
-type Entry = {
-  id: string
-  description: string
-  amount: number
-  type: 'income' | 'expense'
-  category: ExpenseCategory | IncomeCategory
-  date: string
-}
-
 function App() {
   const [entries, setEntries] = useState<Entry[]>([])
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [type, setType] = useState<'income' | 'expense'>('expense')
   const [category, setCategory] = useState<ExpenseCategory | IncomeCategory>('飲食')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [sheetUrlInput, setSheetUrlInput] = useState(getSheetUrl())
 
-  const addEntry = (e: React.FormEvent) => {
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const url = getSheetUrl()
+    try {
+      if (url) {
+        const data = await fetchFromSheet(url)
+        setEntries(data)
+        saveToLocal(data)
+      } else {
+        setEntries(loadFromLocal())
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '載入失敗')
+      setEntries(loadFromLocal())
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const handleSaveSheetUrl = () => {
+    setSheetUrl(sheetUrlInput.trim())
+    setSheetUrlInput(sheetUrlInput.trim())
+    setShowSettings(false)
+    loadData()
+  }
+
+  const addEntry = async (e: React.FormEvent) => {
     e.preventDefault()
     const num = parseFloat(amount)
     if (!description.trim() || isNaN(num) || num <= 0) return
 
-    setEntries([
-      ...entries,
-      {
-        id: crypto.randomUUID(),
-        description: description.trim(),
-        amount: num,
-        type,
-        category,
-        date: new Date().toISOString().slice(0, 10),
-      },
-    ])
-    setDescription('')
-    setAmount('')
+    const newEntry: Entry = {
+      id: crypto.randomUUID(),
+      description: description.trim(),
+      amount: num,
+      type,
+      category,
+      date: new Date().toISOString().slice(0, 10),
+    }
+
+    const url = getSheetUrl()
+    setError(null)
+    try {
+      if (url) {
+        const data = await addToSheet(url, newEntry)
+        setEntries(data)
+        saveToLocal(data)
+      } else {
+        const updated = [...entries, newEntry]
+        setEntries(updated)
+        saveToLocal(updated)
+      }
+      setDescription('')
+      setAmount('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '新增失敗')
+    }
   }
 
-  const deleteEntry = (id: string) => {
-    setEntries(entries.filter((e) => e.id !== id))
+  const deleteEntry = async (id: string) => {
+    const url = getSheetUrl()
+    setError(null)
+    try {
+      if (url) {
+        const data = await deleteFromSheet(url, id)
+        setEntries(data)
+        saveToLocal(data)
+      } else {
+        const updated = entries.filter((e) => e.id !== id)
+        setEntries(updated)
+        saveToLocal(updated)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '刪除失敗')
+    }
   }
 
   const totalIncome = entries
@@ -67,7 +130,57 @@ function App() {
       <header className="ledger-header">
         <h1>記帳本</h1>
         <p className="subtitle">簡單管理你的收支</p>
+        <button
+          type="button"
+          className="btn-settings"
+          onClick={() => setShowSettings(!showSettings)}
+          title="設定"
+        >
+          ⚙️
+        </button>
       </header>
+
+      {showSettings && (
+        <div className="settings-panel">
+          <h3>Google Sheet 連線</h3>
+          <p className="settings-hint">
+            請先依照專案 docs/GOOGLE_SHEET_SETUP.md 的說明部署 Apps Script，再貼上網址
+          </p>
+          <input
+            type="url"
+            placeholder="https://script.google.com/macros/s/xxx/exec"
+            value={sheetUrlInput}
+            onChange={(e) => setSheetUrlInput(e.target.value)}
+            className="input-sheet-url"
+          />
+          <div className="settings-actions">
+            <button type="button" className="btn-save-url" onClick={handleSaveSheetUrl}>
+              儲存
+            </button>
+            <button
+              type="button"
+              className="btn-clear-url"
+              onClick={() => {
+                setSheetUrl('')
+                setSheetUrlInput('')
+                setEntries(loadFromLocal())
+                setShowSettings(false)
+              }}
+            >
+              清除（改用本機儲存）
+            </button>
+          </div>
+          {getSheetUrl() && (
+            <p className="settings-status">✓ 已連接 Google Sheet</p>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <div className="error-banner" role="alert">
+          {error}
+        </div>
+      )}
 
       <div className="balance-card">
         <span className="balance-label">目前結餘</span>
@@ -126,14 +239,16 @@ function App() {
             )}
           </div>
         </div>
-        <button type="submit" className="btn-add">
-          新增
+        <button type="submit" className="btn-add" disabled={loading}>
+          {loading ? '載入中...' : '新增'}
         </button>
       </form>
 
       <section className="entry-list">
         <h2>紀錄</h2>
-        {entries.length === 0 ? (
+        {loading ? (
+          <p className="empty">載入中...</p>
+        ) : entries.length === 0 ? (
           <p className="empty">尚無紀錄，新增一筆試試</p>
         ) : (
           <ul>
