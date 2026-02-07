@@ -1,11 +1,18 @@
 import { useState } from 'react'
 import './App.css'
 
+const EXPENSE_CATEGORIES = ['飲食', '交通', '娛樂', '日用', '購物', '其他'] as const
+const INCOME_CATEGORIES = ['薪水', '獎金', '投資', '其他'] as const
+
+type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]
+type IncomeCategory = (typeof INCOME_CATEGORIES)[number]
+
 type Entry = {
   id: string
   description: string
   amount: number
   type: 'income' | 'expense'
+  category: ExpenseCategory | IncomeCategory
   date: string
 }
 
@@ -14,6 +21,7 @@ function App() {
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [type, setType] = useState<'income' | 'expense'>('expense')
+  const [category, setCategory] = useState<ExpenseCategory | IncomeCategory>('飲食')
 
   const addEntry = (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,6 +35,7 @@ function App() {
         description: description.trim(),
         amount: num,
         type,
+        category,
         date: new Date().toISOString().slice(0, 10),
       },
     ])
@@ -90,12 +99,33 @@ function App() {
         />
         <select
           value={type}
-          onChange={(e) => setType(e.target.value as 'income' | 'expense')}
+          onChange={(e) => {
+            const t = e.target.value as 'income' | 'expense'
+            setType(t)
+            setCategory(t === 'expense' ? '飲食' : '薪水')
+          }}
           className="select-type"
         >
           <option value="expense">支出</option>
           <option value="income">收入</option>
         </select>
+        <div className="category-row">
+          <span className="category-label">分類</span>
+          <div className="category-btns">
+            {(type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES).map(
+              (cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`btn-category ${category === cat ? 'active' : ''}`}
+                  onClick={() => setCategory(cat)}
+                >
+                  {cat}
+                </button>
+              )
+            )}
+          </div>
+        </div>
         <button type="submit" className="btn-add">
           新增
         </button>
@@ -111,7 +141,10 @@ function App() {
               <li key={entry.id} className={`entry-item ${entry.type}`}>
                 <div className="entry-info">
                   <span className="entry-desc">{entry.description}</span>
-                  <span className="entry-date">{entry.date}</span>
+                  <span className="entry-meta">
+                    <span className="entry-category">{entry.category}</span>
+                    <span className="entry-date">{entry.date}</span>
+                  </span>
                 </div>
                 <div className="entry-right">
                   <span className={`entry-amount ${entry.type}`}>
