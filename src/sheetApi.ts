@@ -35,38 +35,59 @@ export function saveToLocal(entries: Entry[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
 }
 
-// 使用 CORS 代理繞過跨域限制（StackBlitz 等環境需要）
-const CORS_PROXY = 'https://corsproxy.io/?url='
+// CORS 代理列表，依序嘗試（StackBlitz 等環境可能阻擋直接請求）
+const CORS_PROXIES: ((u: string) => string)[] = [
+  (u) => `https://api.cors.lol/?url=${encodeURIComponent(u)}`,
+  (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+]
 
-function getFetchUrl(url: string): string {
-  if (!url) return url
+function getFetchUrls(url: string): string[] {
+  if (!url) return []
   const trimmed = url.trim()
   const isGoogleScript = trimmed.includes('script.google.com')
-  const alreadyProxied = trimmed.includes('corsproxy.io') || trimmed.includes('cors.sh')
+  const alreadyProxied =
+    trimmed.includes('corsproxy.io') ||
+    trimmed.includes('cors.sh') ||
+    trimmed.includes('cors.lol')
   if (isGoogleScript && !alreadyProxied) {
-    return CORS_PROXY + encodeURIComponent(trimmed)
+    return CORS_PROXIES.map((fn) => fn(trimmed))
   }
-  return trimmed
+  return [trimmed]
+}
+
+async function fetchWithProxies(
+  url: string,
+  options?: RequestInit
+): Promise<Response> {
+  const urls = getFetchUrls(url)
+  let lastError: unknown
+  for (const fetchUrl of urls) {
+    try {
+      const res = await fetch(fetchUrl, options)
+      if (res.ok) return res
+      lastError = new Error(`HTTP ${res.status}`)
+    } catch (e) {
+      lastError = e
+    }
+  }
+  throw lastError
 }
 
 export async function fetchFromSheet(url: string): Promise<Entry[]> {
-  const fetchUrl = getFetchUrl(url)
-  const res = await fetch(fetchUrl)
-  if (!res.ok) throw new Error('無法載入資料')
+  const res = await fetchWithProxies(url)
   const data = await res.json()
   return Array.isArray(data) ? data : []
 }
 
 export async function addToSheet(url: string, entry: Entry): Promise<Entry[]> {
-  const fetchUrl = getFetchUrl(url)
-  const res = await fetch(fetchUrl, {
+  const res = await fetchWithProxies(url, {
     method: 'POST',
     mode: 'cors',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'add', entry }),
   })
-  if (!res.ok) throw new Error('新增失敗')
   const data = await res.json()
+  if (!data.success) throw new Error(data.message || '新增失敗')
   return data.entries || []
 }
 
@@ -74,14 +95,13 @@ export async function deleteFromSheet(
   url: string,
   id: string
 ): Promise<Entry[]> {
-  const fetchUrl = getFetchUrl(url)
-  const res = await fetch(fetchUrl, {
+  const res = await fetchWithProxies(url, {
     method: 'POST',
     mode: 'cors',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'delete', id }),
   })
-  if (!res.ok) throw new Error('刪除失敗')
   const data = await res.json()
+  if (!data.success) throw new Error(data.message || '刪除失敗')
   return data.entries || []
 }
