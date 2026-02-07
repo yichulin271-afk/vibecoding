@@ -93,9 +93,24 @@ async function fetchWithProxies(
   throw lastError
 }
 
+async function parseJsonResponse(res: Response): Promise<unknown> {
+  const text = await res.text()
+  const trimmed = text.trim()
+  if (trimmed.startsWith('<') || trimmed.toLowerCase().startsWith('<!')) {
+    throw new Error(
+      '收到 HTML 而非 JSON，可能是代理或網址錯誤。請嘗試：1) 取消勾選「使用 CORS 代理」 2) 確認 Apps Script 網址正確'
+    )
+  }
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`無法解析回應：${trimmed.slice(0, 50)}...`)
+  }
+}
+
 export async function fetchFromSheet(url: string): Promise<Entry[]> {
   const res = await fetchWithProxies(url)
-  const data = await res.json()
+  const data = await parseJsonResponse(res)
   return Array.isArray(data) ? data : []
 }
 
@@ -106,7 +121,11 @@ export async function addToSheet(url: string, entry: Entry): Promise<Entry[]> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'add', entry }),
   })
-  const data = await res.json()
+  const data = (await parseJsonResponse(res)) as {
+    success?: boolean
+    message?: string
+    entries?: Entry[]
+  }
   if (!data.success) throw new Error(data.message || '新增失敗')
   return data.entries || []
 }
@@ -121,7 +140,11 @@ export async function deleteFromSheet(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'delete', id }),
   })
-  const data = await res.json()
+  const data = (await parseJsonResponse(res)) as {
+    success?: boolean
+    message?: string
+    entries?: Entry[]
+  }
   if (!data.success) throw new Error(data.message || '刪除失敗')
   return data.entries || []
 }
