@@ -1,3 +1,14 @@
+# 議題抽籤箱
+
+小聚分享用的抽籤頁面：點箱子（或按空白鍵）→ 箱子搖晃、開蓋、籤紙飛出、顯示議題。
+
+- 開啟：`npm run dev` 後前往 `http://localhost:5173/draw.html`
+- 「編輯議題」：一行一個議題，會存在瀏覽器（localStorage）
+- 「抽過的不放回」：勾選時同一個議題不會重複抽到；「全部放回」可重來
+- 快捷鍵：空白鍵／Enter 抽籤或關閉結果，Esc 關閉結果
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
